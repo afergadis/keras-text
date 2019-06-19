@@ -3,17 +3,13 @@ from __future__ import absolute_import
 import abc
 import logging
 import spacy
-
-from . import utils
 import numpy as np
-
 from copy import deepcopy
 from collections import defaultdict, OrderedDict
 from multiprocessing import cpu_count
-
 from keras.preprocessing.sequence import pad_sequences as keras_pad_sequences
 from keras.utils.generic_utils import Progbar
-
+from keras_text import utils
 
 logger = logging.getLogger(__name__)
 
@@ -103,7 +99,7 @@ def _recursive_apply(lst, apply_fn):
 
 
 def _to_unicode(text):
-    if not isinstance(text, unicode):
+    if not isinstance(text, np.unicode):
         text = text.decode('utf-8')
     return text
 
@@ -126,13 +122,25 @@ def _parse_spacy_kwargs(**kwargs):
     return n_threads, batch_size
 
 
-def _pad_token_sequences(sequences, max_tokens=None,
-                         padding='pre', truncating='pre', value=0.):
-    return keras_pad_sequences(sequences, maxlen=max_tokens, padding=padding, truncating=truncating, value=value)
+def _pad_token_sequences(sequences,
+                         max_tokens=None,
+                         padding='pre',
+                         truncating='pre',
+                         value=0.):
+    return keras_pad_sequences(
+        sequences,
+        maxlen=max_tokens,
+        padding=padding,
+        truncating=truncating,
+        value=value)
 
 
-def _pad_sent_sequences(sequences, max_sentences=None, max_tokens=None,
-                        padding='pre', truncating='pre', value=0.):
+def _pad_sent_sequences(sequences,
+                        max_sentences=None,
+                        max_tokens=None,
+                        padding='pre',
+                        truncating='pre',
+                        value=0.):
     # Infer max lengths if needed.
     if max_sentences is None or max_tokens is None:
         max_sentences_computed = 0
@@ -156,20 +164,27 @@ def _pad_sent_sequences(sequences, max_sentences=None, max_tokens=None,
         elif truncating == 'post':
             trunc = sent_seq[:max_sentences]
         else:
-            raise ValueError('Truncating type "%s" not understood' % truncating)
+            raise ValueError(
+                'Truncating type "%s" not understood' % truncating)
 
         # Apply padding.
         if padding == 'post':
-            result[idx, :len(trunc)] = _pad_token_sequences(trunc, max_tokens, padding, truncating, value)
+            result[idx, :len(trunc)] = _pad_token_sequences(
+                trunc, max_tokens, padding, truncating, value)
         elif padding == 'pre':
-            result[idx, -len(trunc):] = _pad_token_sequences(trunc, max_tokens, padding, truncating, value)
+            result[idx, -len(trunc):] = _pad_token_sequences(
+                trunc, max_tokens, padding, truncating, value)
         else:
             raise ValueError('Padding type "%s" not understood' % padding)
     return result
 
 
-def pad_sequences(sequences, max_sentences=None, max_tokens=None,
-                  padding='pre', truncating='post', value=0.):
+def pad_sequences(sequences,
+                  max_sentences=None,
+                  max_tokens=None,
+                  padding='pre',
+                  truncating='post',
+                  value=0.):
     """Pads each sequence to the same length (length of the longest sequence or provided override).
 
     Args:
@@ -190,9 +205,11 @@ def pad_sequences(sequences, max_sentences=None, max_tokens=None,
 
     # Determine if input is (samples, max_sentences, max_tokens) or not.
     if isinstance(sequences[0][0], list):
-        x = _pad_sent_sequences(sequences, max_sentences, max_tokens, padding, truncating, value)
+        x = _pad_sent_sequences(sequences, max_sentences, max_tokens, padding,
+                                truncating, value)
     else:
-        x = _pad_token_sequences(sequences, max_tokens, padding, truncating, value)
+        x = _pad_token_sequences(sequences, max_tokens, padding, truncating,
+                                 value)
     return np.array(x, dtype='int32')
 
 
@@ -216,10 +233,7 @@ def unicodify(texts):
 
 
 class Tokenizer(object):
-
-    def __init__(self,
-                 lang='en',
-                 lower=True):
+    def __init__(self, lang='en', lower=True):
         """Encodes text into `(samples, aux_indices..., token)` where each token is mapped to a unique index starting
         from `1`. Note that `0` is a reserved for unknown tokens.
 
@@ -274,19 +288,21 @@ class Tokenizer(object):
                 tokens will be kept. Set to None to keep everything. (Default value: None)
         """
         if not self.has_vocab:
-            raise ValueError("You need to build the vocabulary using `build_vocab` "
-                             "before using `apply_encoding_options`")
+            raise ValueError(
+                "You need to build the vocabulary using `build_vocab` "
+                "before using `apply_encoding_options`")
         if min_token_count < 1:
             raise ValueError("`min_token_count` should atleast be 1")
 
         # Remove tokens with freq < min_token_count
         token_counts = list(self._token_counts.items())
-        token_counts = filter(lambda x: x[1] >= min_token_count, token_counts)
+        token_counts = list(
+            filter(lambda x: x[1] >= min_token_count, token_counts))
 
         # Clip to max_tokens.
         if max_tokens is not None:
             token_counts.sort(key=lambda x: x[1], reverse=True)
-            filtered_tokens = zip(*token_counts)[0]
+            filtered_tokens = list(zip(*token_counts))[0]
             filtered_tokens = filtered_tokens[:max_tokens]
         else:
             filtered_tokens = zip(*token_counts)[0]
@@ -308,7 +324,9 @@ class Tokenizer(object):
             The encoded texts.
         """
         if not self.has_vocab:
-            raise ValueError("You need to build the vocabulary using `build_vocab` before using `encode_texts`")
+            raise ValueError(
+                "You need to build the vocabulary using `build_vocab` before using `encode_texts`"
+            )
 
         progbar = Progbar(len(texts), verbose=verbose, interval=0.25)
         encoded_texts = []
@@ -326,7 +344,7 @@ class Tokenizer(object):
             progbar.update(indices[0])
 
         # All done. Finalize progressbar.
-        progbar.update(len(texts), force=True)
+        progbar.update(len(texts))
         return encoded_texts
 
     def decode_texts(self, encoded_texts, unknown_token="<UNK>", inplace=True):
@@ -341,12 +359,15 @@ class Tokenizer(object):
             The decoded texts.
         """
         if len(self._token2idx) == 0:
-            raise ValueError("You need to build vocabulary using `build_vocab` before using `decode_texts`")
+            raise ValueError(
+                "You need to build vocabulary using `build_vocab` before using `decode_texts`"
+            )
 
         if not inplace:
             encoded_texts = deepcopy(encoded_texts)
-        _recursive_apply(encoded_texts,
-                         lambda token_id: self._idx2token.get(token_id) or unknown_token)
+        _recursive_apply(
+            encoded_texts, lambda token_id: self._idx2token.get(token_id) or
+            unknown_token)
         return encoded_texts
 
     def build_vocab(self, texts, verbose=1, **kwargs):
@@ -358,7 +379,9 @@ class Tokenizer(object):
             **kwargs: The kwargs for `token_generator`.
         """
         if self.has_vocab:
-            logger.warn("Tokenizer already has existing vocabulary. Overriding and building new vocabulary.")
+            logger.warn(
+                "Tokenizer already has existing vocabulary. Overriding and building new vocabulary."
+            )
 
         progbar = Progbar(len(texts), verbose=verbose, interval=0.25)
         count_tracker = _CountTracker()
@@ -380,7 +403,7 @@ class Tokenizer(object):
         # All done. Finalize progressbar update and count tracker.
         count_tracker.finalize()
         self._counts = count_tracker.counts
-        progbar.update(len(texts), force=True)
+        progbar.update(len(texts))
 
     def get_counts(self, i):
         """Numpy array of count values for aux_indices. For example, if `token_generator` generates
@@ -391,7 +414,9 @@ class Tokenizer(object):
         `get_stats` method.
         """
         if not self.has_vocab:
-            raise ValueError("You need to build the vocabulary using `build_vocab` before using `get_counts`")
+            raise ValueError(
+                "You need to build the vocabulary using `build_vocab` before using `get_counts`"
+            )
         return self._counts[i]
 
     def get_stats(self, i):
@@ -460,7 +485,6 @@ class Tokenizer(object):
 
 
 class WordTokenizer(Tokenizer):
-
     def __init__(self,
                  lang='en',
                  lower=True,
@@ -560,7 +584,6 @@ class WordTokenizer(Tokenizer):
 
 
 class SentenceWordTokenizer(WordTokenizer):
-
     def __init__(self,
                  lang='en',
                  lower=True,
@@ -590,15 +613,9 @@ class SentenceWordTokenizer(WordTokenizer):
                 Supported entity types can be found here: https://spacy.io/docs/usage/entity-recognition#entity-types
                 (Default value: ['PERSON'])
         """
-        super(SentenceWordTokenizer, self).__init__(lang,
-                                                    lower,
-                                                    lemmatize,
-                                                    remove_punct,
-                                                    remove_digits,
-                                                    remove_stop_words,
-                                                    exclude_oov,
-                                                    exclude_pos_tags,
-                                                    exclude_entities)
+        super(SentenceWordTokenizer, self).__init__(
+            lang, lower, lemmatize, remove_punct, remove_digits,
+            remove_stop_words, exclude_oov, exclude_pos_tags, exclude_entities)
 
     def token_generator(self, texts, **kwargs):
         """Yields tokens from texts as `(text_idx, sent_idx, word)`
@@ -633,11 +650,7 @@ class SentenceWordTokenizer(WordTokenizer):
 
 
 class CharTokenizer(Tokenizer):
-
-    def __init__(self,
-                 lang='en',
-                 lower=True,
-                 charset=None):
+    def __init__(self, lang='en', lower=True, charset=None):
         """Encodes text into `(samples, characters)`
 
         Args:
@@ -660,11 +673,7 @@ class CharTokenizer(Tokenizer):
 
 
 class SentenceCharTokenizer(CharTokenizer):
-
-    def __init__(self,
-                 lang='en',
-                 lower=True,
-                 charset=None):
+    def __init__(self, lang='en', lower=True, charset=None):
         """Encodes text into `(samples, sentences, characters)`
 
         Args:
@@ -696,7 +705,8 @@ class SentenceCharTokenizer(CharTokenizer):
         }
 
         # Perf optimization: Lower the entire text instead of individual tokens.
-        texts_gen = _apply_generator(texts, lambda x: x.lower()) if self.lower else texts
+        texts_gen = _apply_generator(
+            texts, lambda x: x.lower()) if self.lower else texts
         for text_idx, doc in enumerate(nlp.pipe(texts_gen, **kwargs)):
             for sent_idx, sent in enumerate(doc.sents):
                 for word in sent:
@@ -711,9 +721,11 @@ if __name__ == '__main__':
     ]
 
     texts = unicodify(texts)
-    tokenizer = SentenceWordTokenizer()
+    tokenizer = SentenceWordTokenizer(lang='en_core_web_sm')
     tokenizer.build_vocab(texts)
     tokenizer.apply_encoding_options(max_tokens=5)
     encoded = tokenizer.encode_texts(texts)
     decoded = tokenizer.decode_texts(encoded, inplace=False)
+    print(texts)
+    print(decoded)
     w = 1
