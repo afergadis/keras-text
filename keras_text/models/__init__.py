@@ -1,3 +1,3 @@
-from token_model import TokenModelFactory
-from sentence_model import SentenceModelFactory
-from sequence_encoders import *
+from keras_text.models.token_model import TokenModelFactory
+from keras_text.models.sentence_model import SentenceModelFactory
+from keras_text.models.sequence_encoders import *

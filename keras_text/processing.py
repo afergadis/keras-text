@@ -729,11 +729,12 @@ if __name__ == '__main__':
     ]
 
     texts = unicodify(texts)
-    tokenizer = SentenceWordTokenizer(lang='en_core_web_sm')
+    tokenizer = WordTokenizer(lang='en_core_web_sm')
     tokenizer.build_vocab(texts)
     tokenizer.apply_encoding_options(max_tokens=5)
     encoded = tokenizer.encode_texts(texts)
     decoded = tokenizer.decode_texts(encoded, inplace=False)
     print(texts)
+    print(encoded)
     print(decoded)
     w = 1
