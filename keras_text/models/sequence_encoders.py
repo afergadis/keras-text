@@ -3,11 +3,10 @@ from __future__ import absolute_import
 from keras.layers import Conv1D, Bidirectional, LSTM
 from keras.layers import GlobalMaxPooling1D, GlobalAveragePooling1D, Dropout
 from keras.layers.merge import concatenate
-from .layers import AttentionLayer, ConsumeMask
+from keras_text.models.layers import ConsumeMask, AttentionLayer
 
 
 class SequenceEncoderBase(object):
-
     def __init__(self, dropout_rate=0.5):
         """Creates a new instance of sequence encoder.
 
@@ -56,8 +55,11 @@ class SequenceEncoderBase(object):
 
 
 class YoonKimCNN(SequenceEncoderBase):
-
-    def __init__(self, num_filters=64, filter_sizes=[3, 4, 5], dropout_rate=0.5, **conv_kwargs):
+    def __init__(self,
+                 num_filters=64,
+                 filter_sizes=[3, 4, 5],
+                 dropout_rate=0.5,
+                 **conv_kwargs):
         """Yoon Kim's shallow cnn model: https://arxiv.org/pdf/1408.5882.pdf
 
         Args:
@@ -73,17 +75,26 @@ class YoonKimCNN(SequenceEncoderBase):
     def build_model(self, x):
         pooled_tensors = []
         for filter_size in self.filter_sizes:
-            x_i = Conv1D(self.num_filters, filter_size, activation='elu', **self.conv_kwargs)(x)
+            x_i = Conv1D(
+                self.num_filters,
+                filter_size,
+                activation='elu',
+                **self.conv_kwargs)(x)
             x_i = GlobalMaxPooling1D()(x_i)
             pooled_tensors.append(x_i)
 
-        x = pooled_tensors[0] if len(self.filter_sizes) == 1 else concatenate(pooled_tensors, axis=-1)
+        x = pooled_tensors[0] if len(self.filter_sizes) == 1 else concatenate(
+            pooled_tensors, axis=-1)
         return x
 
 
 class StackedRNN(SequenceEncoderBase):
-
-    def __init__(self, rnn_class=LSTM, hidden_dims=[50, 50], bidirectional=True, dropout_rate=0.5, **rnn_kwargs):
+    def __init__(self,
+                 rnn_class=LSTM,
+                 hidden_dims=[50, 50],
+                 bidirectional=True,
+                 dropout_rate=0.5,
+                 **rnn_kwargs):
         """Creates a stacked RNN.
 
         Args:
@@ -101,7 +112,8 @@ class StackedRNN(SequenceEncoderBase):
     def build_model(self, x):
         for i, n in enumerate(self.hidden_dims):
             is_last_layer = i == len(self.hidden_dims) - 1
-            rnn = self.rnn_class(n, return_sequences=not is_last_layer, **self.rnn_kwargs)
+            rnn = self.rnn_class(
+                n, return_sequences=not is_last_layer, **self.rnn_kwargs)
             if self.bidirectional:
                 x = Bidirectional(rnn)(x)
             else:
@@ -113,8 +125,12 @@ class StackedRNN(SequenceEncoderBase):
 
 
 class AttentionRNN(SequenceEncoderBase):
-
-    def __init__(self, rnn_class=LSTM, encoder_dims=50, bidirectional=True, dropout_rate=0.5, **rnn_kwargs):
+    def __init__(self,
+                 rnn_class=LSTM,
+                 encoder_dims=50,
+                 bidirectional=True,
+                 dropout_rate=0.5,
+                 **rnn_kwargs):
         """Creates an RNN model with attention. The attention mechanism is implemented as described
         in https://www.cs.cmu.edu/~hovy/papers/16HLT-hierarchical-attention-networks.pdf, but without
         sentence level attention.
@@ -132,7 +148,8 @@ class AttentionRNN(SequenceEncoderBase):
         self.rnn_kwargs = rnn_kwargs
 
     def build_model(self, x):
-        rnn = self.rnn_class(self.encoder_dims, return_sequences=True, **self.rnn_kwargs)
+        rnn = self.rnn_class(
+            self.encoder_dims, return_sequences=True, **self.rnn_kwargs)
         if self.bidirectional:
             word_activations = Bidirectional(rnn)(x)
         else:
@@ -153,7 +170,6 @@ class AttentionRNN(SequenceEncoderBase):
 
 
 class AveragingEncoder(SequenceEncoderBase):
-
     def __init__(self, dropout_rate=0):
         """An encoder that averages sequence inputs.
         """
